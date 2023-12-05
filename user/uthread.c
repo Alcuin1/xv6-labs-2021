@@ -15,9 +15,9 @@ struct thread {
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
 };
-struct thread all_thread[MAX_THREAD];
-struct thread *current_thread;
-extern void thread_switch(uint64, uint64);
+struct thread all_thread[MAX_THREAD]; // definate the thread array which contains MAX_THREAD = 4 threads C语言中，数组名称即地址
+struct thread *current_thread; 
+extern void thread_switch(uint64, uint64); // 是声明，不是定义，没有分配内存。但是在别处定义了。
               
 void 
 thread_init(void)
@@ -40,20 +40,21 @@ thread_schedule(void)
   next_thread = 0;
   t = current_thread + 1;
   for(int i = 0; i < MAX_THREAD; i++){
-    if(t >= all_thread + MAX_THREAD)
+    if(t >= all_thread + MAX_THREAD) // all_thread is the address in C language. It seems like the % operation
       t = all_thread;
-    if(t->state == RUNNABLE) {
+    if(t->state == RUNNABLE) { 
       next_thread = t;
       break;
     }
     t = t + 1;
   }
-
+  // 如果没有可运行的线程，exit退出
   if (next_thread == 0) {
     printf("thread_schedule: no runnable threads\n");
     exit(-1);
   }
-
+  
+  // 准备切换线程
   if (current_thread != next_thread) {         /* switch threads?  */
     next_thread->state = RUNNING;
     t = current_thread;
@@ -62,6 +63,8 @@ thread_schedule(void)
      * Invoke thread_switch to switch from t to next_thread:
      * thread_switch(??, ??);
      */
+    // 从 proc.h 中借鉴一下 context 结构体，用于保存 ra、sp 以及 callee-saved registers：
+     thread_switch(t->ctx, next_thread->ctx)
   } else
     next_thread = 0;
 }

@@ -16,6 +16,7 @@ struct context {
   uint64 s9;
   uint64 s10;
   uint64 s11;
+  //caller-saved registers 已经被调用者保存到栈帧中了，所以这里无需保存这一部分寄存器。 
 };
 
 // Per-CPU state.
@@ -82,11 +83,17 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// 学生提问：怎么区分不同进程的内核线程？
+// Robert教授：每一个进程都有一个独立的内核线程。实际上有两件事情可以区分不同进程的内核线程，其中一件是，每个进程都有不同的内核栈，它由proc结构体中的kstack字段所指向；
+// 另一件就是，任何内核代码都可以通过调用myproc函数来获取当前CPU正在运行的进程。内核线程可以通过调用这个函数知道自己属于哪个用户进程。
+// myproc函数会使用tp寄存器来获取当前的CPU核的ID，并使用这个ID在一个保存了所有CPU上运行的进程的结构体数组中，找到对应的proc结构体。这就是不同的内核线程区分自己的方法。
 // Per-process state
 struct proc {
+  //lock字段保护了很多数据，目前来说至少保护了对于state字段的更新。举个例子，因为有锁的保护，两个CPU的调度器线程不会同时拉取同一个RUNABLE进程并运行它
   struct spinlock lock;
 
   // p->lock must be held when using these:
+  // state字段保存了当前进程状态，要么是RUNNING，要么是RUNABLE，要么是SLEEPING等等
   enum procstate state;        // Process state
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
@@ -97,10 +104,13 @@ struct proc {
   struct proc *parent;         // Parent process
 
   // these are private to the process, so p->lock need not be held.
+  // 保存了当前进程的内核栈的kstack字段，这是进程在内核中执行时保存函数调用的位置
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
-  struct trapframe *trapframe; // data page for trampoline.S
+  // 保存了用户空间线程寄存器的trapframe字段
+  struct trapframe *trapframe; // data page for trampoline.S 
+  // 保存了内核线程寄存器的context字段
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory

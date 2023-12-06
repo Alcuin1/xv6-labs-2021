@@ -91,7 +91,7 @@ thread_schedule(void)
      // 在XV6的代码中，context对象总是由swtch函数产生，所以context总是保存了内核线程在执行swtch函数时的状态。当我们在恢复一个内核线程时，对于刚恢复的线程所做的第一件事情就是从之前的swtch函数中返回
      // swtch(&p->context, &c->context)含义如下：
      // swtch函数会将当前内核线程的寄存器保存到p->context中。swtch函数的另一个参数c->context，c表示当前CPU的结构体。CPU结构体中的context保存了当前CPU核的调度器线程的寄存器。所以swtch函数在保存完当前内核线程的内核寄存器之后，就会恢复当前CPU核的调度器线程的寄存器，并继续执行当前CPU核的调度器线程。
-     thread_switch(t->ctx, next_thread->ctx);
+     thread_switch(&t->ctx, &next_thread->ctx);
   } else
     next_thread = 0;
 }

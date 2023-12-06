@@ -64,7 +64,7 @@ thread_schedule(void)
      * thread_switch(??, ??);
      */
     // 从 proc.h 中借鉴一下 context 结构体，用于保存 ra、sp 以及 callee-saved registers：
-     thread_switch(t->ctx, next_thread->ctx)
+     thread_switch(t->ctx, next_thread->ctx);
   } else
     next_thread = 0;
 }

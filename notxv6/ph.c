@@ -16,7 +16,12 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
-pthread_mutex_t lock;            // declare a lock
+// pthread_mutex_t lock;            // declare a lock
+// 这里的原因是，我们为整个操作加上了互斥锁，意味着每一时刻只能有一个线程在操作哈希表，这里实际上等同于将哈希表的操作变回单线程了，又由于锁操作（加锁、解锁、锁竞争）是有开销的，所以性能甚至不如单线程版本。
+//这里的优化思路，也是多线程效率的一个常见的优化思路，就是降低锁的粒度。由于哈希表中，不同的 bucket 是互不影响的，一个 bucket 处于修改未完全的状态并不影响 put 和 get 对其他 bucket 的操作，
+//所以实际上只需要确保两个线程不会同时操作同一个 bucket 即可，并不需要确保不会同时操作整个哈希表。
+//所以可以将加锁的粒度，从整个哈希表一个锁降低到每个 bucket 一个锁。
+pthread_mutex_t locks[NBUCKET];  //
 
 double
 now()
@@ -41,8 +46,9 @@ insert(int key, int value, struct entry **p, struct entry *n)
 static 
 void put(int key, int value)
 {
-  pthread_mutex_lock(&lock);       // acquire lock
+  // pthread_mutex_lock(&lock);       // acquire lock
   int i = key % NBUCKET;
+  pthread_mutex_lock(&locks[i]);
 
   // is the key already present?
   struct entry *e = 0;
@@ -59,21 +65,24 @@ void put(int key, int value)
     // 即在桶的末尾插入一个新的entry
     insert(key, value, &table[i], table[i]);
   }
-    pthread_mutex_unlock(&lock);     // release lock
+    // pthread_mutex_unlock(&lock);     // release lock
+  pthread_mutex_unlock(&locks[i]);
 
 }
 
 static struct entry*
 get(int key)
 {
-  pthread_mutex_lock(&lock);       // acquire lock
+  // pthread_mutex_lock(&lock);       // acquire lock
   int i = key % NBUCKET;
+  pthread_mutex_lock(&locks[i]);
 
   struct entry *e = 0;
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key) break;
   }
-  pthread_mutex_unlock(&lock);     // release lock
+  // pthread_mutex_unlock(&lock);     // release lock
+  pthread_mutex_unlock(&locks[i]);
   return e;
 }
 
@@ -110,7 +119,11 @@ main(int argc, char *argv[])
   pthread_t *tha;
   void *value;
   double t1, t0;
-  pthread_mutex_init(&lock, NULL); // initialize the lock
+  // pthread_mutex_init(&lock, NULL); // initialize the lock
+
+  for(int i=0;i<NBUCKET;i++) {
+    pthread_mutex_init(&locks[i], NULL); 
+  }
 
 
   if (argc < 2) {
